@@ -24,78 +24,76 @@ public class UnpackAssetsActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.unpack_assets);
+        setContentView(R.layout.loading);
 
         // unpack in different thread to let the progressbar spin
-        the_thread = new Thread(new Runnable() {
-            public void run() {
-                try {
-                    final AssetManager asman = getAssets();
+        the_thread = new Thread(() -> {
+            try {
+                final AssetManager asman = getAssets();
 
-                    // read first line from assets-hash.txt
-                    final String new_hash = new BufferedReader(new InputStreamReader(asman.open("assets-hash.txt"))).readLine();
+                // read first line from assets-hash.txt
+                final String new_hash = new BufferedReader(new InputStreamReader(asman.open("assets-hash.txt"))).readLine();
 
-                    // and compare it with what we have already
-                    SharedPreferences shpr = getSharedPreferences("fe9733f0bfb7", 0);
+                // and compare it with what we have already
+                SharedPreferences shpr = getSharedPreferences("fe9733f0bfb7", 0);
 
-                    final String prev_hash = shpr.getString("assets-hash", null);
+                final String prev_hash = shpr.getString("assets-hash", null);
 
-                    // unpack everything again, if something changes
-                    if (prev_hash == null || !prev_hash.equals(new_hash)) {
-                        final byte[] buffer = new byte[10240];
+                // unpack everything again, if something changes
+                if (prev_hash == null || !prev_hash.equals(new_hash)) {
+                    final byte[] buffer = new byte[10240];
 
-                        final String persistent_dir = getApplicationInfo().dataDir;
+                    final String persistent_dir = getApplicationInfo().dataDir;
 
-                        Queue<String> queue = new ArrayDeque();
-                        queue.add("conf");
-                        queue.add("share");
-                        queue.add("license");
+                    Queue<String> queue = new ArrayDeque();
+                    queue.add("conf");
+                    queue.add("share");
+                    queue.add("license");
 
-                        while (!queue.isEmpty()) {
-                            final String path = queue.element();
-                            queue.remove();
+                    while (!queue.isEmpty()) {
+                        final String path = queue.element();
+                        queue.remove();
 
-                            final String[] list = asman.list(path);
+                        final String[] list = asman.list(path);
 
-                            if (list.length == 0) {
-                                final InputStream file_stream = asman.open(path);
+                        if (list.length == 0) {
+                            final InputStream file_stream = asman.open(path);
 
-                                final String full_path = persistent_dir + "/fsdk/" + path;
+                            final String full_path = persistent_dir + "/fsdk/" + path;
 
-                                new File(full_path).getParentFile().mkdirs();
+                            new File(full_path).getParentFile().mkdirs();
 
-                                final FileOutputStream out_file = new FileOutputStream(full_path);
+                            final FileOutputStream out_file = new FileOutputStream(full_path);
 
-                                for (; ; ) {
-                                    final int read = file_stream.read(buffer);
+                            for (; ; ) {
+                                final int read = file_stream.read(buffer);
 
-                                    if (read <= 0)
-                                        break;
+                                if (read <= 0)
+                                    break;
 
-                                    out_file.write(buffer, 0, read);
-                                }
-
-                                file_stream.close();
-                                out_file.close();
-                            } else {
-                                for (String p : list)
-                                    queue.add(path + "/" + p);
+                                out_file.write(buffer, 0, read);
                             }
-                        }
 
-                        SharedPreferences.Editor editor = shpr.edit();
-                        editor.putString("assets-hash", new_hash);
-                        while (!editor.commit()) ;
+                            file_stream.close();
+                            out_file.close();
+                        } else {
+                            for (String p : list)
+                                queue.add(path + "/" + p);
+                        }
                     }
 
-                    Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-                    startActivity(intent);
-                    finish();
-                } catch (Exception e) {
-                    Log.e("UnpackAssetsActivity", e.getMessage());
-                    e.printStackTrace();
-                    finishAffinity();
+                    SharedPreferences.Editor editor = shpr.edit();
+                    editor.putString("assets-hash", new_hash);
+                    while (!editor.commit()) ;
                 }
+
+                Intent intent = new Intent(getApplicationContext(), MainActivity.class);
+                startActivity(intent);
+                finish();
+            } catch (Exception e) {
+                Log.e("UnpackAssetsActivity", e.getMessage());
+                e.printStackTrace();
+                finishAffinity();
             }
         });
 

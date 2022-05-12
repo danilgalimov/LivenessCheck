@@ -2,83 +2,46 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal">
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/verdictTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginRight="16dp"
+        android:text="Статус: нет"
+        android:textColor="@color/black" />
+
+    <TextView
+        android:id="@+id/checkTypeTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginRight="16dp"
+        android:layout_marginBottom="8dp"
+        android:text="Тип проверки: не проводится"
+        android:textColor="@color/black" />
 
     <ImageView
         android:id="@+id/mainImageView"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="0.6"
-        android:keepScreenOn="true" />
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:keepScreenOn="true"
+        android:contentDescription="" />
 
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="0.4"
-        android:orientation="vertical">
-
-        <ScrollView
-            android:id="@+id/scrollView"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="0.64"
-            android:padding="10dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/textViewVerdict"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Статус проверки: посмотрите в камеру" />
-
-                <TextView
-                    android:id="@+id/textViewCheckType"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:text="Тип проверки: нет" />
-
-                <TextView
-                    android:id="@+id/textView"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_margin="10dp"
-                    android:gravity="center"
-                    android:text="Прогресс"
-                    android:textSize="20sp" />
-
-                <ProgressBar
-                    android:id="@+id/progressBarProgressLevel"
-                    style="?android:attr/progressBarStyleHorizontal"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="10dp"
-                    android:layout_marginRight="10dp"
-                    android:max="100" />
-            </LinearLayout>
-        </ScrollView>
-
-        <Button
-            android:id="@+id/settings_button"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_margin="10dp"
-            android:layout_weight="0.12"
-            android:text="@string/settings_button_text" />
-
-        <Button
-            android:id="@+id/quit_button"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_margin="10dp"
-            android:layout_weight="0.12"
-            android:text="@string/quit_button_text" />
-
-    </LinearLayout>
+    <Button
+        android:id="@+id/quitButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginRight="16dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/quit_text" />
 
 
 </LinearLayout>

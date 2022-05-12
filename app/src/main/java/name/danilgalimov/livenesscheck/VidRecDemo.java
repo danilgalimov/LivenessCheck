@@ -1,10 +1,6 @@
 package name.danilgalimov.livenesscheck;
 
-import android.app.AlertDialog;
-import android.app.Dialog;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
@@ -12,10 +8,7 @@ import android.os.Handler;
 import android.util.Log;
 import android.util.Pair;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
-
-import androidx.fragment.app.FragmentManager;
 
 import com.vdt.face_recognition.sdk.ActiveLiveness;
 import com.vdt.face_recognition.sdk.Capturer;
@@ -31,8 +24,6 @@ import com.vdt.face_recognition.sdk.TrackingLostCallbackData;
 import com.vdt.face_recognition.sdk.VideoWorker;
 import com.vdt.face_recognition.sdk.utils.Converter_YUV_NV_2_ARGB;
 
-import java.io.ByteArrayOutputStream;
-import java.io.OutputStream;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.Vector;
@@ -42,14 +33,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class VidRecDemo implements TheCameraPainter {
 
     private static final String TAG = "VidRecDemo";
-    private static final String SETTINGS_NAME = "SETTINGS";
 
-    ActiveLiveness.ActiveLivenessStatus st;
+    ActiveLiveness.ActiveLivenessStatus mActiveLivenessStatus;
+    ActiveLiveness.CheckType mPreviousCheckType;
 
     private final MainActivity activity;
-    private ImageView mainImageView = null;
-    private ProgressBar mProgressLevel;
-    private TextView mTextViewVerdict, mTextViewCheckType;
+
+    private ImageView mainImageView;
+    private TextView mVerdictTextView, mCheckTypeTextView;
 
     private Capturer capturer = null;
     private final VideoWorker videoWorker;
@@ -57,8 +48,7 @@ public class VidRecDemo implements TheCameraPainter {
     //This thread used for background async initialization of some Face SDK components for speedup.
     private final Thread init_thread;
 
-    private final String method_recognizer;
-    private final float threshold;
+    private final String method_recognizer = "recognizer_latest_v30.xml";
 
     private final LinkedBlockingQueue<Pair<Integer, Bitmap>> frames = new LinkedBlockingQueue<>();
     private final int stream_id = 0;
@@ -73,26 +63,8 @@ public class VidRecDemo implements TheCameraPainter {
         android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO);
 
         Log.v(TAG, "Start VidRecDemo");
-        SharedPreferences shared_settings = activity.getSharedPreferences(SETTINGS_NAME, 0);
 
-        // get recognizer settings
-        int method_index = shared_settings.getInt("method index", 0);
-        switch (method_index) {
-            case 0:
-                method_recognizer = shared_settings.getString("rec_method0", "recognizer_latest_v30.xml");
-                threshold = Float.parseFloat(shared_settings.getString("threshold0", "6250"));
-                break;
-            case 1:
-                method_recognizer = shared_settings.getString("rec_method1", "method9v30mask_recognizer.xml");
-                threshold = Float.parseFloat(shared_settings.getString("threshold1", "3600"));
-                break;
-            default:
-                method_recognizer = shared_settings.getString("rec_method2", "method8v7_recognizer.xml");
-                threshold = Float.parseFloat(shared_settings.getString("threshold2", "7000"));
-                break;
-        }
-
-        final FacerecService service = MainActivity.getService();
+        final FacerecService service = MainActivity.getFacerecService();
         Log.v(TAG, "Loaded settings");
 
         Log.v(TAG, "Starting init thread");
@@ -142,18 +114,25 @@ public class VidRecDemo implements TheCameraPainter {
                         .streams_count(1)
                         .processing_threads_count(1)
                         .matching_threads_count(1)
-                        .short_time_identification_enabled(true)
-                        .short_time_identification_distance_threshold(threshold)
-                        .short_time_identification_outdate_time_seconds(5)
                         .active_liveness_checks_order(checks)
         );
 
         //add callbacks
         videoWorker.addTrackingCallbackU(new TrackingCallbacker());
         videoWorker.addTrackingLostCallbackU(new TrackingLostCallbacker());
-        videoWorker.addMatchFoundCallbackU(new MatchFoundCallbacker());
-        videoWorker.addStiPersonOutdatedCallbackU(new StiPersonOutdatedCallbacker());
         Log.v(TAG, "creating worker done");
+    }
+
+    public void setMainImageView(ImageView mainImageView) {
+        this.mainImageView = mainImageView;
+    }
+
+    public void setVerdictTextView(TextView verdictTextView) {
+        mVerdictTextView = verdictTextView;
+    }
+
+    public void setCheckTypeTextView(TextView checkTypeTextView) {
+        mCheckTypeTextView = checkTypeTextView;
     }
 
     @Override
@@ -217,7 +196,7 @@ public class VidRecDemo implements TheCameraPainter {
                     RawSample sample = data.samples.get(i);
                     int id = sample.getID();
 
-					st = data.samples_active_liveness_status.get(i);
+					mActiveLivenessStatus = data.samples_active_liveness_status.get(i);
 
                     if (!drawingData.faces.containsKey(id)) {
                         FaceData faceData = new FaceData(sample);
@@ -235,7 +214,6 @@ public class VidRecDemo implements TheCameraPainter {
         }
     }
 
-
     private class TrackingLostCallbacker implements VideoWorker.TrackingLostCallbackU {
 
         public void call(TrackingLostCallbackData data) {
@@ -251,9 +229,7 @@ public class VidRecDemo implements TheCameraPainter {
 
             synchronized (drawingData) {
 
-                if (drawingData.faces.isEmpty()) {
-                    return;
-                }
+                if (drawingData.faces.isEmpty()) return;
 
                 FaceData face = drawingData.faces.get(data.track_id);
 
@@ -269,50 +245,11 @@ public class VidRecDemo implements TheCameraPainter {
         }
     }
 
-    private class StiPersonOutdatedCallbacker implements VideoWorker.StiPersonOutdatedCallbackU {
-
-        public void call(StiPersonOutdatedCallbackData data) {
-
-            if (data.stream_id != stream_id)
-                return;
-
-            Log.i(TAG, "sti person outdated callback: "
-                    + "  sti_person_id: " + data.sti_person_id
-            );
-        }
-    }
-
-    private class MatchFoundCallbacker implements VideoWorker.MatchFoundCallback {
-
-        public void call(MatchFoundCallbackData data) {
-
-            if (data.stream_id != stream_id)
-                return;
-
-            data.sample.getID();
-
-            synchronized (drawingData) {
-
-                if (drawingData.faces.isEmpty()) {
-                    return;
-                }
-
-                drawingData.updated = true;
-            }
-        }
-    }
-
-
     public void startDrawThread(final Handler handler) {
 
         if (drawThread != null) {
             closeDrawThread();
         }
-
-        mainImageView = activity.findViewById(R.id.mainImageView);
-        mProgressLevel = activity.findViewById(R.id.progressBarProgressLevel);
-        mTextViewCheckType = activity.findViewById(R.id.textViewCheckType);
-        mTextViewVerdict = activity.findViewById(R.id.textViewVerdict);
 
         drawThread = new Thread(() -> {
 
@@ -338,7 +275,6 @@ public class VidRecDemo implements TheCameraPainter {
     public void updateImageViews() {
         synchronized (drawingData) {
 
-            //draw only first 7 faces
             int count = 0;
             SortedSet<Integer> keys = new TreeSet<>(drawingData.faces.keySet());
 
@@ -395,7 +331,6 @@ public class VidRecDemo implements TheCameraPainter {
                     //milliseconds
                     long alive_lost_time = 1000;
                     if (cur_time - face.lost_time > alive_lost_time) {
-                        mTextViewVerdict.setText("Статус: посмотрите в камеру");
                         drawingData.faces.remove(key);
                         continue;
                     }
@@ -403,46 +338,53 @@ public class VidRecDemo implements TheCameraPainter {
 
 
                 if (count > 1) {
-                    mTextViewVerdict.setText("Статус: для прохождения проверки в кадре должно находится одно лицо");
                     break;
                 }
                 count++;
 
             }
 
-            if (st != null) {
-                switch (st.verdict.toString()) {
-                    case "ALL_CHECKS_PASSED":
-                        mTextViewVerdict.setText("Статус: все проверки пройдены.");
-                        break;
-                    case "CURRENT_CHECK_PASSED":
-                        mTextViewVerdict.setText("Статус: текущая проверка пройдена.");
-                        break;
-                    case "CHECK_FAIL":
-                        mTextViewVerdict.setText("Статус: проверка не удалась.");
-                        break;
-                    case "WAITING_FACE_ALIGN":
-                        mTextViewVerdict.setText("Статус: в ожидании нейтрального положения лица.");
-                        break;
-                    case "NOT_COMPUTED":
-                        mTextViewVerdict.setText("Статус: Liveness не оценивается.");
-                        break;
-                    case "IN_PROGRESS":
-                        mTextViewVerdict.setText("Статус: проверка в процессе.");
-                        break;
+            if (mActiveLivenessStatus != null) {
+                    switch (mActiveLivenessStatus.verdict.toString()) {
+                        case "ALL_CHECKS_PASSED":
+                            mVerdictTextView.setText(String.format(activity.getString(R.string.verdict), "все проверки пройдены"));
+                            break;
+                        case "CURRENT_CHECK_PASSED":
+                            mVerdictTextView.setText(String.format(activity.getString(R.string.verdict), "текущая проверка пройдена"));
+                            break;
+                        case "CHECK_FAIL":
+
+                            mVerdictTextView.setText(String.format(activity.getString(R.string.verdict), "проверка не пройдена"));
+                            break;
+                        case "WAITING_FACE_ALIGN":
+                            mVerdictTextView.setText(String.format(activity.getString(R.string.verdict), "в ожидании нейтрального положения лица"));
+                            break;
+                        case "NOT_COMPUTED":
+                            mVerdictTextView.setText(String.format(activity.getString(R.string.verdict), "не выполняется"));
+                            break;
+                        case "IN_PROGRESS":
+                            mVerdictTextView.setText(String.format(activity.getString(R.string.verdict), "в процессе"));
+                            break;
+                    }
+                if (mPreviousCheckType != mActiveLivenessStatus.check_type) {
+                    switch (mActiveLivenessStatus.check_type.toString()) {
+                        case "BLINK":
+                            mPreviousCheckType = mActiveLivenessStatus.check_type;
+                            mCheckTypeTextView.setText(String.format(activity.getString(R.string.check_type), "моргните"));
+                            activity.whatToDo("Моргните");
+                            break;
+                        case "TURN_UP":
+                            mPreviousCheckType = mActiveLivenessStatus.check_type;
+                            mCheckTypeTextView.setText(String.format(activity.getString(R.string.check_type), "поднимите голову, а потом опустите обратно"));
+                            activity.whatToDo("Поднимите голову, а потом опустите обратно");
+                            break;
+                        case "TURN_DOWN":
+                            mPreviousCheckType = mActiveLivenessStatus.check_type;
+                            mCheckTypeTextView.setText(String.format(activity.getString(R.string.check_type), "опустите голову, а потом поднимите обратно"));
+                            activity.whatToDo("Опустите голову, а потом поднимите обратно");
+                            break;
+                    }
                 }
-                switch (st.check_type.toString()) {
-                    case "BLINK":
-                        mTextViewCheckType.setText("Тип проверки: моргните.");
-                        break;
-                    case "TURN_UP":
-                        mTextViewCheckType.setText("Тип проверки: поднимите голову.");
-                        break;
-                    case "TURN_DOWN":
-                        mTextViewCheckType.setText("Тип проверки: опустите голову.");
-                        break;
-                }
-                mProgressLevel.setProgress((int) (st.progress_level * 100));
             }
 
             mainImageView.setImageBitmap(drawingData.frame);
